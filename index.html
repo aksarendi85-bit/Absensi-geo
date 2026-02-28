@@ -1,37 +1,30 @@
 <!DOCTYPE html>
 <html>
 <head>
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ABSENSI GEO FIX</title>
-
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ABSENSI GEO</title>
 <style>
-body {
-  font-family: Arial;
-  text-align: center;
-  background: linear-gradient(135deg,#0f2027,#203a43,#2c5364);
-  color: white;
-  padding: 20px;
+body{
+  font-family:Arial;
+  text-align:center;
+  background:#0f2027;
+  color:white;
+  padding:20px;
 }
-video, canvas {
-  width: 100%;
-  max-width: 350px;
-  border-radius: 15px;
-  margin-top: 10px;
+video{
+  width:100%;
+  max-width:350px;
+  border-radius:15px;
+  background:black;
 }
-button {
-  padding: 12px 20px;
-  margin: 10px;
-  border: none;
-  border-radius: 10px;
-  background: #00c6ff;
-  color: white;
-  font-weight: bold;
-}
-input, select {
-  padding: 8px;
-  border-radius: 8px;
-  border: none;
-  margin: 5px;
+button{
+  padding:12px 20px;
+  margin:10px;
+  border:none;
+  border-radius:10px;
+  background:#00c6ff;
+  color:white;
+  font-weight:bold;
 }
 </style>
 </head>
@@ -39,74 +32,59 @@ input, select {
 
 <h2>ABSENSI GEO SECURE</h2>
 
-<input type="text" id="nama" placeholder="Nama Anda" required><br>
+<input type="text" id="nama" placeholder="Nama Anda"><br><br>
 
 <select id="jenis">
   <option value="Masuk">Absen Masuk</option>
   <option value="Pulang">Absen Pulang</option>
-</select><br>
+</select><br><br>
 
-<video id="video" autoplay playsinline muted></video>
+<video id="video" autoplay playsinline></video>
 <canvas id="canvas" style="display:none;"></canvas><br>
 
-<button id="btnFoto" disabled>Ambil Foto</button>
+<button onclick="ambilFoto()">Ambil Foto</button>
 <button onclick="kirim()">Kirim Absen</button>
 
 <p id="status"></p>
 
 <script>
 
-const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbzZa_W47OnVIonuchDuqXmOVHaMr55JDiqJYNOhl8-8eblFZpgTEZaSCsZcGusAAdMf/exec";
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzZa_W47OnVIonuchDuqXmOVHaMr55JDiqJYNOhl8-8eblFZpgTEZaSCsZcGusAAdMf/exec";
 
 let fotoBase64 = "";
 let latitude = "";
 let longitude = "";
-let accuracy = 0;
+let accuracy = "";
 
 const video = document.getElementById("video");
 const canvas = document.getElementById("canvas");
-const btnFoto = document.getElementById("btnFoto");
 const statusText = document.getElementById("status");
 
 async function startCamera(){
   try{
     const stream = await navigator.mediaDevices.getUserMedia({
-      video: true,
-      audio: false
+      video:{facingMode:"user"},
+      audio:false
     });
-
     video.srcObject = stream;
-
-    video.onloadedmetadata = () => {
-      video.play();
-      btnFoto.disabled = false;
-      statusText.innerText = "Kamera siap ✔";
-    };
-
+    await video.play();
   }catch(err){
-    statusText.innerText = "❌ Kamera gagal: " + err.message;
+    statusText.innerText="❌ Kamera gagal: "+err.message;
   }
 }
 
-function getLocation(){
-  navigator.geolocation.getCurrentPosition(pos=>{
-    latitude = pos.coords.latitude;
-    longitude = pos.coords.longitude;
-    accuracy = pos.coords.accuracy;
-  }, err=>{
-    statusText.innerText = "❌ GPS gagal";
-  }, {enableHighAccuracy:true});
-}
+startCamera();
 
-window.onload = function(){
-  startCamera();
-  getLocation();
-};
+navigator.geolocation.getCurrentPosition(pos=>{
+  latitude = pos.coords.latitude;
+  longitude = pos.coords.longitude;
+  accuracy = pos.coords.accuracy;
+},{enableHighAccuracy:true});
 
-btnFoto.onclick = function(){
+function ambilFoto(){
 
-  if(video.videoWidth === 0){
-    statusText.innerText = "❌ Kamera belum siap";
+  if(video.readyState !== 4){
+    alert("Tunggu kamera siap...");
     return;
   }
 
@@ -114,17 +92,12 @@ btnFoto.onclick = function(){
   canvas.height = video.videoHeight;
 
   const ctx = canvas.getContext("2d");
-  ctx.drawImage(video, 0, 0);
+  ctx.drawImage(video,0,0,canvas.width,canvas.height);
 
   fotoBase64 = canvas.toDataURL("image/png");
 
-  if(fotoBase64.length < 1000){
-    statusText.innerText = "❌ Foto gagal";
-    return;
-  }
-
-  statusText.innerText = "Foto berhasil ✔";
-};
+  statusText.innerText="✅ Foto berhasil diambil";
+}
 
 async function kirim(){
 
@@ -133,37 +106,34 @@ async function kirim(){
     return;
   }
 
-  statusText.innerText = "Mengirim...";
+  statusText.innerText="Mengirim...";
+
+  const ip = await fetch("https://api.ipify.org?format=json")
+  .then(res=>res.json())
+  .then(data=>data.ip);
+
+  const payload = {
+    nama: document.getElementById("nama").value,
+    jenis: document.getElementById("jenis").value,
+    lat: latitude,
+    lng: longitude,
+    accuracy: accuracy,
+    foto: fotoBase64,
+    ip: ip,
+    device: navigator.userAgent
+  };
 
   try{
-
-    const ip = await fetch("https://api.ipify.org?format=json")
-      .then(res=>res.json())
-      .then(data=>data.ip);
-
-    const payload = {
-      nama: document.getElementById("nama").value,
-      jenis: document.getElementById("jenis").value,
-      lat: latitude,
-      lng: longitude,
-      accuracy: accuracy,
-      foto: fotoBase64,
-      ip: ip,
-      device: navigator.userAgent
-    };
-
-    const response = await fetch(WEB_APP_URL,{
+    const response = await fetch(SCRIPT_URL,{
       method:"POST",
-      headers:{"Content-Type":"application/json"},
       body:JSON.stringify(payload)
     });
 
     const result = await response.json();
-
-    statusText.innerText = result.message;
+    statusText.innerText=result.message;
 
   }catch(err){
-    statusText.innerText = "❌ Gagal kirim: " + err.message;
+    statusText.innerText="❌ Gagal kirim: "+err.message;
   }
 }
 
