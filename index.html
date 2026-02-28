@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ABSENSI GEO</title>
+<title>ABSENSI GEO FIX</title>
 
 <style>
 body {
@@ -12,14 +12,12 @@ body {
   color: white;
   padding: 20px;
 }
-
 video, canvas {
   width: 100%;
   max-width: 350px;
   border-radius: 15px;
   margin-top: 10px;
 }
-
 button {
   padding: 12px 20px;
   margin: 10px;
@@ -29,7 +27,6 @@ button {
   color: white;
   font-weight: bold;
 }
-
 input, select {
   padding: 8px;
   border-radius: 8px;
@@ -52,7 +49,7 @@ input, select {
 <video id="video" autoplay playsinline muted></video>
 <canvas id="canvas" style="display:none;"></canvas><br>
 
-<button onclick="ambilFoto()">Ambil Foto</button>
+<button id="btnFoto" disabled>Ambil Foto</button>
 <button onclick="kirim()">Kirim Absen</button>
 
 <p id="status"></p>
@@ -66,22 +63,28 @@ let latitude = "";
 let longitude = "";
 let accuracy = 0;
 
+const video = document.getElementById("video");
+const canvas = document.getElementById("canvas");
+const btnFoto = document.getElementById("btnFoto");
+const statusText = document.getElementById("status");
+
 async function startCamera(){
   try{
     const stream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: "user" },
+      video: true,
       audio: false
     });
 
-    const video = document.getElementById("video");
     video.srcObject = stream;
-    await video.play();
 
-    document.getElementById("status").innerText = "Kamera aktif ✔";
+    video.onloadedmetadata = () => {
+      video.play();
+      btnFoto.disabled = false;
+      statusText.innerText = "Kamera siap ✔";
+    };
 
   }catch(err){
-    document.getElementById("status").innerText =
-      "❌ Kamera gagal: " + err.message;
+    statusText.innerText = "❌ Kamera gagal: " + err.message;
   }
 }
 
@@ -91,8 +94,7 @@ function getLocation(){
     longitude = pos.coords.longitude;
     accuracy = pos.coords.accuracy;
   }, err=>{
-    document.getElementById("status").innerText =
-      "❌ GPS gagal: " + err.message;
+    statusText.innerText = "❌ GPS gagal";
   }, {enableHighAccuracy:true});
 }
 
@@ -101,35 +103,28 @@ window.onload = function(){
   getLocation();
 };
 
-function ambilFoto(){
+btnFoto.onclick = function(){
 
-  const video = document.getElementById("video");
-  const canvas = document.getElementById("canvas");
+  if(video.videoWidth === 0){
+    statusText.innerText = "❌ Kamera belum siap";
+    return;
+  }
 
-  setTimeout(() => {
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
 
-    const width = video.videoWidth || 640;
-    const height = video.videoHeight || 480;
+  const ctx = canvas.getContext("2d");
+  ctx.drawImage(video, 0, 0);
 
-    canvas.width = width;
-    canvas.height = height;
+  fotoBase64 = canvas.toDataURL("image/png");
 
-    const ctx = canvas.getContext("2d");
-    ctx.drawImage(video, 0, 0, width, height);
+  if(fotoBase64.length < 1000){
+    statusText.innerText = "❌ Foto gagal";
+    return;
+  }
 
-    fotoBase64 = canvas.toDataURL("image/png");
-
-    if(fotoBase64.length < 1000){
-      document.getElementById("status").innerText =
-        "❌ Foto gagal diambil";
-      return;
-    }
-
-    document.getElementById("status").innerText =
-      "Foto berhasil diambil ✔";
-
-  }, 300);
-}
+  statusText.innerText = "Foto berhasil ✔";
+};
 
 async function kirim(){
 
@@ -138,7 +133,7 @@ async function kirim(){
     return;
   }
 
-  document.getElementById("status").innerText="Mengirim...";
+  statusText.innerText = "Mengirim...";
 
   try{
 
@@ -146,7 +141,7 @@ async function kirim(){
       .then(res=>res.json())
       .then(data=>data.ip);
 
-    const data = {
+    const payload = {
       nama: document.getElementById("nama").value,
       jenis: document.getElementById("jenis").value,
       lat: latitude,
@@ -160,22 +155,18 @@ async function kirim(){
     const response = await fetch(WEB_APP_URL,{
       method:"POST",
       headers:{"Content-Type":"application/json"},
-      body:JSON.stringify(data)
+      body:JSON.stringify(payload)
     });
 
-    const text = await response.text();
-    const result = JSON.parse(text);
+    const result = await response.json();
 
-    document.getElementById("status").innerText =
-      result.message;
+    statusText.innerText = result.message;
 
   }catch(err){
-    document.getElementById("status").innerText =
-      "❌ Gagal kirim: " + err.message;
+    statusText.innerText = "❌ Gagal kirim: " + err.message;
   }
 }
 
 </script>
-
 </body>
 </html>
