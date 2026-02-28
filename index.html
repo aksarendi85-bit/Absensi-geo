@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ABSENSI GEO</title>
+<style>
+body{font-family:Arial;text-align:center;background:#0f2027;color:white;padding:20px;}
+video{width:100%;max-width:350px;border-radius:15px;}
+button{padding:10px 20px;margin:10px;border:none;border-radius:10px;background:#00c6ff;color:white;}
+</style>
+</head>
+<body>
+
+<h2>ABSENSI GEO SECURE</h2>
+
+<input type="text" id="nama" placeholder="Nama Anda"><br><br>
+
+<select id="jenis">
+<option value="Masuk">Absen Masuk</option>
+<option value="Pulang">Absen Pulang</option>
+</select><br><br>
+
+<video id="video" autoplay playsinline></video>
+<canvas id="canvas" style="display:none;"></canvas><br>
+
+<button onclick="ambilFoto()">Ambil Foto</button>
+<button onclick="kirim()">Kirim Absen</button>
+
+<p id="status"></p>
+
+<script>
+
+const API_URL = "https://script.google.com/macros/s/AKfycbzrLcZeN-bfaJdFZQ1S-Ia1XOfd3sdHRPTE4QUb_iZFK_A4jCZAEJyfl1-i_Lcg6198/exec";
+
+let fotoBase64 = "";
+let latitude = "";
+let longitude = "";
+let accuracy = "";
+
+navigator.mediaDevices.getUserMedia({
+  video:{facingMode:"user"}
+}).then(stream=>{
+  video.srcObject = stream;
+}).catch(()=>{
+  status.innerText="❌ Kamera tidak bisa diakses";
+});
+
+navigator.geolocation.getCurrentPosition(pos=>{
+  latitude = pos.coords.latitude;
+  longitude = pos.coords.longitude;
+  accuracy = pos.coords.accuracy;
+},{enableHighAccuracy:true});
+
+function ambilFoto(){
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
+  canvas.getContext("2d").drawImage(video,0,0);
+  fotoBase64 = canvas.toDataURL("image/png");
+  status.innerText="Foto berhasil ✔";
+}
+
+async function kirim(){
+
+  if(!fotoBase64){ alert("Ambil foto dulu"); return; }
+
+  const ip = await fetch('https://api.ipify.org?format=json')
+  .then(r=>r.json()).then(d=>d.ip);
+
+  const res = await fetch(API_URL,{
+    method:"POST",
+    body:JSON.stringify({
+      nama:document.getElementById("nama").value,
+      jenis:document.getElementById("jenis").value,
+      lat:latitude,
+      lng:longitude,
+      accuracy:accuracy,
+      foto:fotoBase64,
+      ip:ip,
+      device:navigator.userAgent
+    })
+  });
+
+  const json = await res.json();
+  status.innerText = json.message;
+}
+
+</script>
+</body>
+</html>
