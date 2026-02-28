@@ -2,18 +2,47 @@
 <html>
 <head>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ABSENSI GEO</title>
+
 <style>
-body {font-family:Arial;text-align:center;background:#0f2027;color:white;padding:20px;}
-video, canvas {width:100%;max-width:350px;border-radius:15px;}
-button {padding:10px 20px;margin:10px;border:none;border-radius:10px;background:#00c6ff;color:white;}
-input, select {padding:8px;border-radius:8px;border:none;margin:5px;}
+body {
+  font-family: Arial;
+  text-align: center;
+  background: linear-gradient(135deg,#0f2027,#203a43,#2c5364);
+  color: white;
+  padding: 20px;
+}
+
+video, canvas {
+  width: 100%;
+  max-width: 350px;
+  border-radius: 15px;
+  margin-top: 10px;
+}
+
+button {
+  padding: 12px 20px;
+  margin: 10px;
+  border: none;
+  border-radius: 10px;
+  background: #00c6ff;
+  color: white;
+  font-weight: bold;
+}
+
+input, select {
+  padding: 8px;
+  border-radius: 8px;
+  border: none;
+  margin: 5px;
+}
 </style>
 </head>
 <body>
 
 <h2>ABSENSI GEO SECURE</h2>
 
-<input type="text" id="nama" placeholder="Nama Anda"><br>
+<input type="text" id="nama" placeholder="Nama Anda" required><br>
 
 <select id="jenis">
   <option value="Masuk">Absen Masuk</option>
@@ -38,37 +67,68 @@ let longitude = "";
 let accuracy = 0;
 
 async function startCamera(){
-  const stream = await navigator.mediaDevices.getUserMedia({
-    video:{facingMode:"user"},
-    audio:false
-  });
-  const video = document.getElementById("video");
-  video.srcObject = stream;
-  await video.play();
+  try{
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: "user" },
+      audio: false
+    });
+
+    const video = document.getElementById("video");
+    video.srcObject = stream;
+    await video.play();
+
+    document.getElementById("status").innerText = "Kamera aktif ✔";
+
+  }catch(err){
+    document.getElementById("status").innerText =
+      "❌ Kamera gagal: " + err.message;
+  }
 }
 
-window.onload = function(){
-  startCamera();
-
+function getLocation(){
   navigator.geolocation.getCurrentPosition(pos=>{
     latitude = pos.coords.latitude;
     longitude = pos.coords.longitude;
     accuracy = pos.coords.accuracy;
-  }, null, {enableHighAccuracy:true});
+  }, err=>{
+    document.getElementById("status").innerText =
+      "❌ GPS gagal: " + err.message;
+  }, {enableHighAccuracy:true});
+}
+
+window.onload = function(){
+  startCamera();
+  getLocation();
 };
 
 function ambilFoto(){
+
   const video = document.getElementById("video");
   const canvas = document.getElementById("canvas");
 
-  canvas.width = video.videoWidth || 640;
-  canvas.height = video.videoHeight || 480;
+  setTimeout(() => {
 
-  const ctx = canvas.getContext("2d");
-  ctx.drawImage(video,0,0);
+    const width = video.videoWidth || 640;
+    const height = video.videoHeight || 480;
 
-  fotoBase64 = canvas.toDataURL("image/png");
-  document.getElementById("status").innerText="Foto berhasil diambil ✔";
+    canvas.width = width;
+    canvas.height = height;
+
+    const ctx = canvas.getContext("2d");
+    ctx.drawImage(video, 0, 0, width, height);
+
+    fotoBase64 = canvas.toDataURL("image/png");
+
+    if(fotoBase64.length < 1000){
+      document.getElementById("status").innerText =
+        "❌ Foto gagal diambil";
+      return;
+    }
+
+    document.getElementById("status").innerText =
+      "Foto berhasil diambil ✔";
+
+  }, 300);
 }
 
 async function kirim(){
@@ -80,31 +140,42 @@ async function kirim(){
 
   document.getElementById("status").innerText="Mengirim...";
 
-  const ip = await fetch("https://api.ipify.org?format=json")
-    .then(res=>res.json())
-    .then(data=>data.ip);
+  try{
 
-  const data = {
-    nama: document.getElementById("nama").value,
-    jenis: document.getElementById("jenis").value,
-    lat: latitude,
-    lng: longitude,
-    accuracy: accuracy,
-    foto: fotoBase64,
-    ip: ip,
-    device: navigator.userAgent
-  };
+    const ip = await fetch("https://api.ipify.org?format=json")
+      .then(res=>res.json())
+      .then(data=>data.ip);
 
-  const response = await fetch(WEB_APP_URL,{
-    method:"POST",
-    headers:{"Content-Type":"application/json"},
-    body:JSON.stringify(data)
-  });
+    const data = {
+      nama: document.getElementById("nama").value,
+      jenis: document.getElementById("jenis").value,
+      lat: latitude,
+      lng: longitude,
+      accuracy: accuracy,
+      foto: fotoBase64,
+      ip: ip,
+      device: navigator.userAgent
+    };
 
-  const result = await response.json();
-  document.getElementById("status").innerText=result.message;
+    const response = await fetch(WEB_APP_URL,{
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify(data)
+    });
+
+    const text = await response.text();
+    const result = JSON.parse(text);
+
+    document.getElementById("status").innerText =
+      result.message;
+
+  }catch(err){
+    document.getElementById("status").innerText =
+      "❌ Gagal kirim: " + err.message;
+  }
 }
 
 </script>
+
 </body>
 </html>
